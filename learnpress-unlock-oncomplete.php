@@ -53,11 +53,40 @@ class LP_Addon_Unlock_OnComplete{
         $this->_plugin_template_path = LP_UNLOCK_ONCOMPLETE_PATH.'/template/';
         $this->_plugin_url  = untrailingslashit( plugins_url( '/', LP_UNLOCK_ONCOMPLETE_FILE ) );
 
-        //add_action('init', array($this, 'create_learning_path'));
-        add_action( 'load-post.php', array( $this, 'add_learning_path_meta_boxes' ), 0 );
-        add_action( 'load-post-new.php', array( $this, 'add_learning_path_meta_boxes' ), 0 );
+        add_action('wp', array($this, 'restrict_until_complete_maybe'));
+        add_action( 'load-post.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
+        add_action( 'load-post-new.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
     }
 
+function restrict_until_complete_maybe(){
+    //echo '<p> I have been called</p>';
+    $out = '';
+    $cUser = learn_press_get_current_user();
+    //echo $cUser;
+    $cPageId = get_the_ID();
+    $unlockCourses = get_post_meta($cPageId, '_lp_unlock_oncomplete', false);
+    $isUnlocked = true;
+    if(sizeof($unlockCourses)<1){
+        return;
+    } else {
+        $userID = get_current_user_id();
+        for($i = 0; $i < sizeof($unlockCourses[0]); $i++){
+        $courseID = $unlockCourses[0][$i];
+        $courseObj = LP_Course::get_course($courseID);
+        $eval = $courseObj->evaluate_course_results($userID);
+        if ($eval < $courseObj->passing_condition){
+            $isUnlocked = false;
+        //wp_redirect('https://www.striderbikes.com/_education');
+            }
+        }
+    }
+
+    if (!$isUnlocked){
+        wp_redirect(get_site_url());
+        exit;
+    }
+
+}
 
 //add metaboxes to the custom post type learn_press_learning_path_cpt
 public function add_unlock_oncomplete_meta_boxes() {
@@ -65,7 +94,7 @@ public function add_unlock_oncomplete_meta_boxes() {
     new RW_Meta_Box(
         apply_filters( 'learn_press_unlock_oncomplete_mb', array(
                 'title'      => __( 'Learning Press Courses To Unlock Page', 'learnpress' ),
-                'post_types' =>'post',
+                'post_types' =>'page',
                 'context'    => 'normal',
                 'priority'   => 'high',
                 'fields'     => array(
