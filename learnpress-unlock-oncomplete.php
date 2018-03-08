@@ -1,7 +1,7 @@
 <?php 
 /*
 Plugin Name: LearnPress Restrict Until Complete
-Plugin URI: https://github.com/nickwilliamsnewby/LearnPress-Learning-Path-Dashboard
+Plugin URI: https://github.com/nickwilliamsnewby/learnpress-unlock-oncomplete
 Description: adds meta boxes to all pages/posts to restrict access until an lpUser completes the selected course
 Author: Nicholas Williams
 Version: 1.0.0
@@ -40,55 +40,75 @@ class LP_Addon_Unlock_OnComplete{
 	 */
     private $_plugin_template_path = '';
 
-    protected $_meta_boxes = array();
+    //protected $_meta_boxes = array();
 
-    protected $_post_type = '';
+    //protected $_post_type = '';
 
-    protected $_tab_slug = 'lp-unlock-oncomplete';
 
 
     function __construct(){
-        $this->_post_type = 'lp_unlock_oncomplete_cpt';
+        //$this->_post_type = 'lp_unlock_oncomplete_cpt';
         $this->_tab_slug = sanitize_title( __( 'lp-unlock-oncomplete', 'learnpress' ) );
         $this->_plugin_template_path = LP_UNLOCK_ONCOMPLETE_PATH.'/template/';
         $this->_plugin_url  = untrailingslashit( plugins_url( '/', LP_UNLOCK_ONCOMPLETE_FILE ) );
 
-        add_action('wp', array($this, 'restrict_until_complete_maybe'));
+        add_action('wp', array($this, 'restrict_until_complete_maybe2'));
+        add_action('wp', array($this, 'add_menu_filter'));
         add_action( 'load-post.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
         add_action( 'load-post-new.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
+        //add_filter('nav_menu_link_attributes', array($this,'lp_unlock_lock_nav_links_maybe'), 10, 3);
     }
 
-function restrict_until_complete_maybe(){
-    //echo '<p> I have been called</p>';
-    $out = '';
-    $cUser = learn_press_get_current_user();
-    //echo $cUser;
-    $cPageId = get_the_ID();
-    $unlockCourses = get_post_meta($cPageId, '_lp_unlock_oncomplete', false);
-    $isUnlocked = true;
-    if(sizeof($unlockCourses)<1){
-        return;
-    } else {
-        $userID = get_current_user_id();
-        for($i = 0; $i < sizeof($unlockCourses[0]); $i++){
-        $courseID = $unlockCourses[0][$i];
-        $courseObj = LP_Course::get_course($courseID);
-        $eval = $courseObj->evaluate_course_results($userID);
-        if ($eval < $courseObj->passing_condition){
-            $isUnlocked = false;
-        //wp_redirect('https://www.striderbikes.com/_education');
+    function add_menu_filter(){
+        add_filter('nav_menu_link_attributes', array($this,'lp_unlock_lock_nav_links_maybe'), 10, 3);
+    }
+
+    function lp_unlock_lock_nav_links_maybe($atts, $item, $args){
+        if( $args->menu == 'primary' ){
+            $id = $item->object_id;
+            $itemUnlocked = $this->lp_unlock_check_ze_page($id);
+            if (!$itemUnlocked){
+                $atts['style'] = 'display: none;';
             }
         }
+        return $atts;
+    }
+/*
+this function is to be called upon the 'wp' hook
+it will check if the current page has chosen to be locked until the completetion 
+of a course(s), if so and the course is not completed by the current use it will 
+redirect the user to the home page
+*/
+    function restrict_until_complete_maybe2(){
+        $pID = get_the_ID();
+        $unlocked = $this->lp_unlock_check_ze_page($pID);
+        if (!$unlocked){
+            wp_redirect(get_site_url());
+            exit;
+        }
+
     }
 
-    if (!$isUnlocked){
-        wp_redirect(get_site_url());
-        exit;
+    function lp_unlock_check_ze_page($cPageId){
+        $cUser = learn_press_get_current_user();
+        $unlockCourses = get_post_meta($cPageId, '_lp_unlock_oncomplete', false);
+        $isUnlocked = true;
+        if(sizeof($unlockCourses)<1){
+            return $isUnlocked;
+        } else {
+            $userID = get_current_user_id();
+            for($i = 0; $i < sizeof($unlockCourses[0]); $i++){
+            $courseID = $unlockCourses[0][$i];
+            $courseObj = LP_Course::get_course($courseID);
+            $eval = $courseObj->evaluate_course_results($userID);
+            if ($eval < $courseObj->passing_condition){
+                $isUnlocked = false;
+                }
+            }
+        }
+        return $isUnlocked;
     }
-
-}
-
-//add metaboxes to the custom post type learn_press_learning_path_cpt
+//add metaboxes to the page editor to lock page by a course or courses
 public function add_unlock_oncomplete_meta_boxes() {
     $prefix                                        = '_lp_';
     new RW_Meta_Box(
@@ -103,7 +123,6 @@ public function add_unlock_oncomplete_meta_boxes() {
                         'id'          => "_lp_unlock_oncomplete",
                         'type'        => 'post',
                         'post_type'   => LP_COURSE_CPT,
-                        //'multiple'    => true,
                         'field_type'  => 'select',
                         'description' => 'Courses that need to be completed to access page',
                         'placeholder' => __( 'Course to Complete', 'learnpress' ),
@@ -126,7 +145,7 @@ public function add_unlock_oncomplete_meta_boxes() {
 		}
 		return self::$_instance;
 	}
-    // load our text domain, not implemented currently but should for translation reasons
+    // load our text domain, not implemented currently but probably should for translation reasons
     static function load_text_domain() {
 		if ( function_exists( 'learn_press_load_plugin_text_domain' ) ) {
 			learn_press_load_plugin_text_domain( LP_LPATH_DASH_PATH, 'learnpress-learningpath-dashboard' );
