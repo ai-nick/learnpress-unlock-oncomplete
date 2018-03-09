@@ -46,23 +46,21 @@ class LP_Addon_Unlock_OnComplete{
 
 
 
+
     function __construct(){
         //$this->_post_type = 'lp_unlock_oncomplete_cpt';
         $this->_tab_slug = sanitize_title( __( 'lp-unlock-oncomplete', 'learnpress' ) );
         $this->_plugin_template_path = LP_UNLOCK_ONCOMPLETE_PATH.'/template/';
         $this->_plugin_url  = untrailingslashit( plugins_url( '/', LP_UNLOCK_ONCOMPLETE_FILE ) );
-
         add_action('wp', array($this, 'restrict_until_complete_maybe2'));
         add_action('wp', array($this, 'add_menu_filter'));
         add_action( 'load-post.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
         add_action( 'load-post-new.php', array( $this, 'add_unlock_oncomplete_meta_boxes' ), 0 );
         //add_filter('nav_menu_link_attributes', array($this,'lp_unlock_lock_nav_links_maybe'), 10, 3);
     }
-
     function add_menu_filter(){
         add_filter('nav_menu_link_attributes', array($this,'lp_unlock_lock_nav_links_maybe'), 10, 3);
     }
-
     function lp_unlock_lock_nav_links_maybe($atts, $item, $args){
         if( $args->menu == 'primary' ){
             $id = $item->object_id;
@@ -79,16 +77,15 @@ it will check if the current page has chosen to be locked until the completetion
 of a course(s), if so and the course is not completed by the current use it will 
 redirect the user to the home page
 */
-    function restrict_until_complete_maybe2(){
-        $pID = get_the_ID();
+    function restrict_until_complete_maybe2($ID){
+        global $wp_query;
+        $pID = $wp_query->get_queried_object_id();
         $unlocked = $this->lp_unlock_check_ze_page($pID);
         if (!$unlocked){
             wp_redirect(get_site_url());
             exit;
         }
-
     }
-
     function lp_unlock_check_ze_page($cPageId){
         $cUser = learn_press_get_current_user();
         $unlockCourses = get_post_meta($cPageId, '_lp_unlock_oncomplete', false);
